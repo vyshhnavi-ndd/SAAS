@@ -9,6 +9,7 @@ from app.models.schemas import SignupRequest, LoginRequest, TokenResponse
 from app.utils.security import hash_password, verify_password, create_access_token
 from app.utils.errors import AuthenticationError, UserNotFoundError, TenantNotFoundError
 from app.utils.logging import get_logger
+from app.services.tenant_service import tenant_service
 
 logger = get_logger(__name__)
 
@@ -21,14 +22,8 @@ class AuthService:
         Returns JWT token for immediate login.
         """
         try:
-            # Create tenant
-            tenant = Tenant(
-                name=request.tenant_name,
-                api_key_hash="temp",  # Will be updated later
-                vector_db_collection_name=f"documents_{request.tenant_name.lower().replace(' ', '_')}",
-            )
-            db.add(tenant)
-            await db.flush()
+            # Create tenant with Weaviate collection
+            tenant = await tenant_service.create_tenant(request.tenant_name, db)
 
             # Create user
             user = User(
