@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthCredential
 from app.utils.security import decode_token
 from app.utils.errors import InvalidTokenError
@@ -47,3 +47,23 @@ async def get_optional_user(
         return None
 
     return await get_current_user(credentials)
+
+
+async def get_current_user_from_request(
+    request: Request,
+) -> Dict[str, Any]:
+    """
+    Get current user from request state (set by TenantContextMiddleware).
+    This is for use after middleware has already extracted and validated the token.
+    """
+    if not hasattr(request.state, "user_id") or not hasattr(request.state, "tenant_id"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return {
+        "user_id": request.state.user_id,
+        "tenant_id": request.state.tenant_id,
+    }

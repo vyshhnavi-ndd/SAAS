@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.database.connection import init_db, close_db
 from app.api.v1 import auth, tenants, documents, chat, health
+from app.middleware.tenant_context import TenantContextMiddleware
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -14,8 +15,11 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting RAG SaaS API...")
-    await init_db()
-    logger.info("Database initialized")
+    try:
+        await init_db()
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.warning(f"Database initialization (non-blocking): {str(e)}")
     yield
     # Shutdown
     logger.info("Shutting down RAG SaaS API...")
@@ -28,7 +32,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware
+# Add CORS middleware (before other middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -36,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add tenant context middleware
+app.add_middleware(TenantContextMiddleware)
 
 # Include routers
 app.include_router(health.router)
